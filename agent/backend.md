@@ -1,7 +1,7 @@
 ---
 description: "Python FastAPI 后端开发 Agent。根据 OpenSpec artifacts 和 API 契约，在 backend/ 目录下实现后端 API 和业务逻辑。"
 mode: "all"
-model: "netease-codemaker/claude-sonnet-4-6"
+model: "claude-sonnet-4-6"
 steps: 50
 permission:
   read: "allow"
