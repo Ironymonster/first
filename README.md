@@ -119,8 +119,8 @@ Phase 5    完成汇报          Spec Agent 生成 7 章节 report.md，push 并
 
 | Agent | 模型 |
 |---|---|
-| Manager、Frontend | `netease-openspec/claude-opus-4-6` |
-| Spec、Backend、Test | `netease-openspec/claude-sonnet-4-6` |
+| Manager、Frontend | `-openspec/claude-opus-4-6` |
+| Spec、Backend、Test | `-openspec/claude-sonnet-4-6` |
 
 ---
 
@@ -137,124 +137,7 @@ Phase 5    完成汇报          Spec Agent 生成 7 章节 report.md，push 并
 
 ---
 
-## 安装与启动
 
-### 1. 安装 openspec CLI
-
-**macOS / Linux：**
-
-```bash
-curl -fsSL https://openspec.netease.com/package/openspec-cli/install | bash
-```
-
-**Windows（PowerShell）：**
-
-```powershell
-irm https://openspec.netease.com/package/openspec-cli/install.ps1 | iex
-```
-
-**Windows（CMD）：**
-
-```cmd
-powershell -Command "irm https://openspec.netease.com/package/openspec-cli/install.ps1 | iex"
-```
-
-验证安装：
-
-```bash
-openspec --version
-```
-
-### 2. 一键启动
-
-**Windows：**
-
-```cmd
-start.bat
-```
-
-**macOS / Linux：**
-
-```bash
-bash start.sh
-```
-
-启动脚本自动完成以下 4 步：
-
-1. **Step 1** — 启动 `openspec serve --port 4096`（内部 Agent 驱动服务）
-2. **Step 2** — 启动 FastAPI 后端（`python -m uvicorn server:app --port 2024`）
-3. **Step 3** — 启动 Next.js 前端（`pnpm dev`，端口 3000，约需 10 秒）
-4. **Step 4** — 前台启动 Manager Agent（交互式 TUI）
-
-启动后服务地址：
-
-| 服务 | 地址 | 说明 |
-|---|---|---|
-| Manager Agent TUI | 当前终端 | 直接输入需求开始使用 |
-| 前端 Web UI | http://localhost:3000 | 实时监控面板 |
-| 后端 API | http://localhost:2024 | FastAPI + WebSocket 监控 |
-| openspec serve | http://localhost:4096 | 内部 Agent 驱动（无需直接访问） |
-| API 文档 | http://localhost:2024/docs | FastAPI 自动文档 |
-| 日志目录 | `.openspec/logs/` | 各服务日志文件 |
-
----
-
-## 使用方式
-
-### 交互式模式（推荐）
-
-通过 `start.bat` / `start.sh` 启动后，在 Manager Agent TUI 中直接输入需求描述，Manager 会自动引导整个流程：
-
-```
-你：我需要一个用户管理页面，支持增删改查和分页
-Manager：好的，我来帮你分析需求...（开始策划）
-```
-
-Manager Agent 会按流水线阶段自动执行，无需手动干预。
-
-### Orchestrator 命令行模式
-
-在项目根目录执行各阶段命令，适合手动介入或恢复中断的任务：
-
-```bash
-# 策划阶段（Manager 已完成沟通后）
-python orchestrator/orchestrator.py plan --req 001 --git-commit
-
-# 生成 Demo 预览
-python orchestrator/orchestrator.py demo --req 001
-
-# 并行开发（阻塞等待两个 Agent 完成）
-python orchestrator/orchestrator.py develop --req 001 --git-commit
-
-# 测试验收
-python orchestrator/orchestrator.py test --req 001 --git-commit
-
-# 修复（测试失败时）
-python orchestrator/orchestrator.py fix --req 001 --git-commit
-
-# Bug 修复（独立流水线，指定 Agent 和问题描述）
-python orchestrator/orchestrator.py bugfix --agent frontend --description "表格分页数据错误"
-python orchestrator/orchestrator.py bugfix --agent backend --description "接口返回 500 错误"
-
-# 代码优化
-python orchestrator/orchestrator.py pref --req 001 --target frontend --git-commit
-python orchestrator/orchestrator.py pref --req 001 --target backend --git-commit
-
-# 查看进度
-python orchestrator/orchestrator.py status --req 001
-python orchestrator/orchestrator.py status --follow frontend
-```
-
-### 全自动模式
-
-无人值守，从开发到 MR 一键完成（适合 CI 场景）：
-
-```bash
-python orchestrator/orchestrator.py run --req 001
-python orchestrator/orchestrator.py run --req 001 --max-rounds 5 --base-branch master
-```
-
----
 
 ## Orchestrator 命令参考
 
@@ -643,7 +526,7 @@ MIT
 
 ## 致谢
 
-- [openspec](https://openspec.netease.com) — AI 编程助手，提供 Agent 驱动底层
+- [openspec](https://openspec..com) — AI 编程助手，提供 Agent 驱动底层
 - [OpenSpec](https://openspec.dev) — 规范驱动开发工作流
 - [LangGraph](https://github.com/langchain-ai/langgraph) — 多 Agent 状态图框架
 - [agent-chat-ui](https://github.com/langchain-ai/agent-chat-ui) — 前端 UI 基础框架
