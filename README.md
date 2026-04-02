@@ -1,532 +1,172 @@
 # ChainAgent
 
-> 基于 openspec 的多 Agent 全自动开发流水线，同时也是一个 AI 多 Agent 协作的聊天监控系统
+> 基于 Claude CLI 的多 Agent 编排框架（Go 版）
 
-🤖 **5 Agent 协作** &nbsp;|&nbsp; 📋 **OpenSpec 规范驱动** &nbsp;|&nbsp; ⚡ **前后端并行开发** &nbsp;|&nbsp; 🔁 **自动测试修复循环** &nbsp;|&nbsp; 📡 **WebSocket 实时监控**
+ChainAgent 是一个开箱即用的多 Agent 协作开发框架，通过 `claude` CLI 驱动多个专项 Agent（Manager、Spec、Frontend、Backend、Test）并行工作，自动完成从需求分析、架构设计到代码实现、测试验收的完整开发流程。
 
----
+每个 Agent 以 **Skill** 形式封装（`skills/<role>/`），包含角色定义、模型配置和规范文件，自描述、自包含、可插拔。
 
-## 功能概览
+## 🚀 快速开始
 
-| 功能 | 说明 |
-|---|---|
-| **5 Agent 协作体系** | Manager / Spec / Frontend / Backend / Test 各司其职，全自动流水线 |
-| **OpenSpec 规范驱动** | spec-driven 工作流，需求 → proposal → specs → design → tasks 完整生命周期 |
-| **前端 Demo 预览** | 开发前生成 HTML Demo，与用户确认设计方向后再进入实际开发 |
-| **前后端并行开发** | Frontend + Backend Agent 同步启动，最大化开发效率 |
-| **自动测试验收** | Test Agent 对照 OpenSpec 接受标准执行验收测试，生成 QA 报告 |
-| **智能修复循环** | 测试失败自动触发修复，最多 10 轮，同步更新开发规范防止复现 |
-| **独立 Bug 修复流水线** | `bugfix` 命令独立于需求流水线，专项处理线上 bug，最多 5 轮迭代 |
-| **代码质量优化** | 测试通过后执行 pref 优化阶段，清理冗余代码、提升复用性和性能 |
-| **Git 全生命周期管理** | 自动创建特性分支、原子 commit、push 并通过 `-o` 参数创建 MR |
-| **WebSocket 实时监控** | `/ws/monitor` 端点广播 Agent 进度、流水线状态、token 消耗 |
-| **LangGraph 兼容协议** | 实现 `/runs/stream`、`/info`、`/threads` 等 LangGraph 兼容接口 |
-| **开发规范自动生成** | 扫描代码库生成 frontend-rule.mdc / backend-rule.mdc，错误时自动更新 |
-| **彩色终端 + token 统计** | 每个 Agent 独立颜色，实时展示工具调用、步骤进度、费用明细 |
-| **状态持久化** | 运行时状态写入 `.orchestrator/`，断点可查，live.json 实时同步 |
-
----
-
-## 系统架构
-
-```
-用户 (openspec TUI / Web UI)
-  │
-  ▼
-Manager Agent                        claude-opus-4-6
-  │  全程主导，与用户对话，驱动流水线
-  │
-  ├─── spawn ──► Spec Agent           claude-sonnet-4-6
-  │              生成需求文档、OpenSpec artifacts、API 契约、任务分发文件
-  │
-  └─── bash ───► orchestrator.py      Python 编排器
-                  │  调度子 Agent，管理 openspec serve 生命周期
-                  │
-                  ├── agent_runner.py  封装 openspec HTTP API 调用
-                  │
-                  ├── 并行 ──► Frontend Agent    claude-opus-4-6
-                  │            实现 React/TypeScript 前端代码
-                  │
-                  ├── 并行 ──► Backend Agent     claude-sonnet-4-6
-                  │            实现 Python FastAPI 后端代码
-                  │
-                  └────────► Test Agent          claude-sonnet-4-6
-                             验收测试、生成 QA 报告、产出修复请求
-```
-
-**openspec serve**（端口 4096）是所有 Agent 的底层驱动，orchestrator.py 通过其 HTTP API 启动和监控每个 Agent session；FastAPI 后端（端口 2024）通过订阅 openspec serve 的 SSE `/event` 流，将事件转换后通过 WebSocket 推送给前端监控面板。
-
-### 完整流水线（9 阶段）
-
-```
-Phase 0    Git 分支创建      同步 master，检查未合并分支，创建 feat/req-<id>
-Phase 0.5  Rules 初始化      Spec Agent 扫描代码库生成前后端开发规范（首次执行）
-Phase 1    需求策划          Manager 沟通需求 → Spec Agent 生成完整 OpenSpec artifacts
-           └─ Demo 预览      Frontend Agent 生成纯 HTML Demo，用户确认后进入开发
-Phase 2    并行开发          Frontend + Backend Agent 并行执行
-Phase 3    验收测试          Test Agent 对照 spec 接受标准执行自动化验收
-Phase 4    迭代修复          fix 命令触发修复循环（最多 10 轮），同步 updateRule 防止复现
-Phase 4.5  代码质量优化      pref 命令驱动前后端优化：复用性、性能、冗余清理
-Phase 5    完成汇报          Spec Agent 生成 7 章节 report.md，push 并创建 MR
-```
-
----
-
-## 技术栈
-
-**前端**
-
-| 技术 | 版本 | 用途 |
-|---|---|---|
-| Next.js | 15 | App Router 框架 |
-| React | 19 | UI 库 |
-| TypeScript | 5.7 | 类型系统 |
-| TailwindCSS | v4 | 样式框架 |
-| Radix UI | latest | 无障碍基础组件 |
-| @langchain/langgraph-sdk | ^1.0.0 | LangGraph 客户端，对接后端流式接口 |
-| framer-motion | ^12 | 动画 |
-| react-markdown | ^10 | Markdown 渲染（含 KaTeX 数学公式） |
-| nuqs | ^2 | URL 查询参数状态管理 |
-| recharts | ^2 | 数据图表 |
-| pnpm | 10.5.1 | 包管理器 |
-
-**后端**
-
-| 技术 | 版本 | 用途 |
-|---|---|---|
-| Python | 3.12 | 运行时 |
-| FastAPI | latest | API 框架 |
-| LangGraph | ^1.0 | 多 Agent 状态图 |
-| uvicorn | latest | ASGI 服务器 |
-| Pydantic v2 | latest | 数据校验 |
-
-**Agent 编排**
-
-| 技术 | 用途 |
-|---|---|
-| openspec CLI | Agent 驱动底层，`openspec serve` 提供 HTTP API |
-| orchestrator.py | 多 Agent 调度、并行控制、状态追踪 |
-| agent_runner.py | 封装 openspec HTTP API 调用，实时事件解析 |
-
-**文档工作流**
-
-| 技术 | 用途 |
-|---|---|
-| OpenSpec (spec-driven) | 结构化需求 → 设计 → 任务的完整工作流 |
-| openspec CLI | 创建 change、生成 artifact 模板、检查状态 |
-
-**AI 模型**
-
-| Agent | 模型 |
-|---|---|
-| Manager、Frontend | `-openspec/claude-opus-4-6` |
-| Spec、Backend、Test | `-openspec/claude-sonnet-4-6` |
-
----
-
-## 环境要求
-
-| 依赖 | 版本 | 说明 |
-|---|---|---|
-| openspec CLI | 最新版 | **核心依赖，必须安装** |
-| Python | 3.12+ | 编排器运行环境 |
-| Node.js | 18+ | 前端开发服务 |
-| pnpm | 10+ | 前端包管理器 |
-| Git | 2.x+ | 分支和提交管理 |
-| openspec CLI | 最新版 | OpenSpec 工作流支持 |
-
----
-
-
-
-## Orchestrator 命令参考
-
-### 子命令
-
-| 命令 | 用途 | 使用阶段 |
-|---|---|---|
-| `run` | 全自动流水线：develop → test → fix → push MR | 无人值守 |
-| `plan` | 触发 Spec Agent 生成 OpenSpec artifacts 和 API 契约 | 阶段 1 |
-| `demo` | 启动 Frontend Agent 生成纯 HTML Demo 页面 | 阶段 1 Demo |
-| `develop` | 并行启动 Frontend + Backend Agent，阻塞等待完成 | 阶段 2 |
-| `test` | 启动 Test Agent 执行验收测试，产出 QA 报告 | 阶段 3 |
-| `fix` | 读取修复请求，并行启动 Frontend + Backend 修复 | 阶段 4 |
-| `pref` | 驱动前端或后端执行代码质量优化 | 阶段 4.5 |
-| `bugfix` | 独立 Bug 修复流水线，指定 Agent 和问题描述 | 随时（线上 bug）|
-| `status` | 查看所有需求或指定需求的实时进度 | 随时 |
-
-### 公共参数
-
-| 参数 | 说明 | 默认值 |
-|---|---|---|
-| `--req <id>` | 需求 ID（对应 `docs/requirements/REQ-<id>.md`） | — |
-| `--git-commit` | 完成后自动执行 `git add -A && git commit` | 关闭 |
-| `--no-git` | 禁用所有 Git 操作（仅 `run` 命令） | 关闭 |
-| `--max-rounds <n>` | 全自动流水线最大循环轮次（仅 `run` 命令） | — |
-| `--base-branch <branch>` | 基础分支（仅 `run` 命令） | `master` |
-| `--target <frontend\|backend>` | 优化目标（仅 `pref` 命令） | 两者 |
-| `--agent <frontend\|backend>` | 指定修复 Agent（仅 `bugfix` 命令） | — |
-| `--description "<text>"` | Bug 描述（仅 `bugfix` 命令） | — |
-| `--follow <agent>` | 跟踪指定 Agent 状态（仅 `status` 命令） | — |
-
-### 输出格式
-
-每个命令完成后，stdout 中输出 `@@ORCHESTRATOR_RESULT@@` 标记，随后跟随 JSON 结果供 Manager Agent 解析：
-
-```json
-{
-  "command": "develop",
-  "req_id": "001",
-  "frontend": { "status": "ok", "exit_code": 0, "elapsed_seconds": 120.5 },
-  "backend":  { "status": "ok", "exit_code": 0, "elapsed_seconds": 150.3 }
-}
-```
-
-```json
-{
-  "command": "test",
-  "req_id": "001",
-  "passed": true,
-  "bug_count": 0,
-  "unresolved_files": [],
-  "summary": "所有测试通过"
-}
-```
-
----
-
-## Bug 修复流水线
-
-Bug 修复流水线独立于需求开发流水线，用于处理线上 Bug 或专项问题修复，不依赖 Spec Agent。
-
-### 流程阶段
-
-```
-B阶段0   分支准备         创建 fix/bug-<seq> 分支，同步 master
-B阶段1   根因分析         Manager 自行分析 Bug 根因（无需 Spec Agent 参与）
-B阶段2   修复调度         使用 bugfix 命令调度指定 Agent 执行修复
-B阶段3   专项验证         spawn Test Agent 对修复结果执行专项验证
-B阶段4   迭代修复         验证不通过时继续迭代（最多 5 轮）
-B阶段5   规范更新 + 推送  updateRule 更新规范防止复现，push 分支并创建 MR
-```
-
-### 使用示例
+### 1. 安装依赖
 
 ```bash
-# 指定前端 Agent 修复 UI Bug
-python orchestrator/orchestrator.py bugfix --agent frontend --description "表格分页后数据重复显示"
+# 安装 Go >= 1.22
+# https://go.dev/dl/
 
-# 指定后端 Agent 修复接口 Bug
-python orchestrator/orchestrator.py bugfix --agent backend --description "POST /chat 偶发 500，concurrent request 时 state 竞争"
+# 安装 Claude CLI
+npm install -g @anthropic-ai/claude-code
+claude login
 
-# 携带 Git commit
-python orchestrator/orchestrator.py bugfix --agent frontend --description "..." --git-commit
+# 安装 opencli（提供 openspec 命令，OpenSpec 工作流必须）
+npm install -g opencli
+opencli login
+```
+
+### 2. 安装 chainagent
+
+```bash
+go install github.com/chainagent-oss/chainagent/cmd/chainagent@latest
+```
+
+或使用一键安装脚本（macOS / Linux）：
+
+```bash
+bash install.sh
+```
+
+### 3. 初始化项目
+
+将 ChainAgent 的 `skills/`、`prompts/`、`openspec/` 目录复制到你的项目根目录，然后执行：
+
+```bash
+# 全自动流水线
+chainagent run --req 001
 ```
 
 ---
 
-## Agent 体系
-
-### 职责一览
-
-| Agent | 角色 | 模型 | 定义文件 |
-|---|---|---|---|
-| **Manager** | 项目经理：需求沟通、流水线编排、向用户汇报；唯一能 spawn 子 Agent 的角色 | claude-opus-4-6 | `.openspec/agents/manager.md` |
-| **Spec** | 技术文档：生成 OpenSpec artifacts、API 契约、开发规范 | claude-sonnet-4-6 | `.openspec/agents/spec.md` |
-| **Frontend** | 前端开发：实现 React/TypeScript 代码、组件设计 | claude-opus-4-6 | `.openspec/agents/frontend.md` |
-| **Backend** | 后端开发：实现 FastAPI 接口、业务逻辑、数据模型 | claude-sonnet-4-6 | `.openspec/agents/backend.md` |
-| **Test** | 质量保障：验收测试、QA 报告、修复请求分发 | claude-sonnet-4-6 | `.openspec/agents/test.md` |
-
-### 权限矩阵
-
-| 权限 | Manager | Spec | Frontend | Backend | Test |
-|---|:---:|:---:|:---:|:---:|:---:|
-| read | ✅ | ✅ | ✅ | ✅ | ✅ |
-| edit | ❌ | ✅ | ✅ | ✅ | ✅ |
-| bash | ✅ | ✅ | ✅ | ✅ | ✅ |
-| glob / grep | ✅ | ✅ | ✅ | ✅ | ✅ |
-| task (spawn) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| webfetch | ✅ | ❌ | ✅ | ✅ | ❌ |
-| question | ✅ | ❌ | ✅ | ✅ | ✅ |
-
-Manager 是唯一能 spawn 子 Agent 的角色（`task(subagent_type="spec")`），Spec Agent 是唯一能写入 `openspec/` 和 `docs/` 的角色，Frontend/Backend 只能修改各自的代码目录。
-
----
-
-## OpenSpec 工作流
-
-ChainAgent 使用 OpenSpec 的 `spec-driven` 模式，将需求转化为结构化设计文档后再驱动开发。
-
-### Artifact 生成顺序
+## 📁 项目结构
 
 ```
-需求输入
-  │
-  ▼
-docs/requirements/REQ-<id>.md          需求文档
-  │
-  ▼ openspec new change "req-<id>"
-  │
-  ├─► proposal.md                       Why + What + Capabilities + Impact
-  ├─► specs/<capability>/spec.md        每个能力点的接受标准和技术约束（各一个文件）
-  ├─► design.md                         技术架构、数据模型、API 设计、前后端交互
-  └─► tasks.md                          可勾选任务清单（区分 frontend / backend / testing）
-```
-
-### 生成的附属产物
-
-- `docs/contracts/api-req-<id>.yaml` — OpenAPI 3.0 格式 API 契约，Frontend/Backend/Test 严格遵守
-- `inbox/frontend/TASK-<id>.md` — 前端任务分发文件（含 artifacts 引用路径）
-- `inbox/backend/TASK-<id>.md` — 后端任务分发文件
-
-### 典型 Spec Agent 调用
-
-Manager 通过以下方式 spawn Spec Agent（禁止使用 `category` 参数）：
-
-```python
-task(subagent_type="spec", run_in_background=False, prompt="""
-## 任务指令
-为 req-001 创建完整的 OpenSpec artifacts（proposal → specs → design → tasks），
-生成 API 契约和任务分发文件。
-
-## 需求内容
-<详细需求描述>
-
-## 关键决策
-<用户确认的技术选型和设计决策>
-""")
+chainagent/
+├── README.md
+├── LICENSE
+├── install.sh                      # 一键安装脚本
+├── go.mod                          # Go 模块定义
+├── cmd/
+│   └── chainagent/
+│       └── main.go                 # CLI 入口（cobra）
+├── internal/
+│   ├── runner/runner.go            # claude subprocess + stream-json 解析
+│   ├── orchestrator/orchestrator.go # 流水线编排
+│   ├── skill/loader.go             # Skill 目录扫描
+│   └── status/status.go            # 状态文件读写
+└── skills/                         # Agent Skill 插件目录（跟项目走）
+    ├── manager/
+    │   ├── SKILL.md                # 角色元数据（name/model/description）
+    │   └── agent.md                # system prompt
+    ├── spec/
+    │   ├── SKILL.md
+    │   └── agent.md
+    ├── frontend/
+    │   ├── SKILL.md
+    │   ├── agent.md
+    │   └── rules/
+    │       └── frontend-rule-template.md
+    ├── backend/
+    │   ├── SKILL.md
+    │   ├── agent.md
+    │   └── rules/
+    │       └── backend-rule-template.md
+    └── test/
+        ├── SKILL.md
+        └── agent.md
 ```
 
 ---
 
-## 后端 API 接口
+## 🤖 Agent Skill 说明
 
-FastAPI 后端（端口 2024）提供以下接口：
+每个 Skill 是自包含的插件单元：
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| `GET` | `/health` | 健康检查 |
-| `GET` | `/agents` | Agent 列表配置 |
-| `GET` | `/pipeline/phases` | 流水线阶段定义 |
-| `POST` | `/chat` | 发送消息（SSE 流式返回）|
-| `GET` | `/chat/stream/{thread_id}` | 订阅消息流（SSE）|
-| `GET` | `/threads` | 获取会话列表 |
-| `POST` | `/threads` | 创建新会话 |
-| `GET` | `/threads/{thread_id}` | 获取会话详情 |
-| `WS` | `/ws/monitor` | 实时监控 WebSocket 通道 |
-| `GET` | `/info` | LangGraph server info |
-| `POST` | `/runs/stream` | 流式运行（LangGraph 协议）|
+```
+skills/frontend/
+├── SKILL.md     ← frontmatter 定义模型和描述
+├── agent.md     ← system prompt（角色能力和规范）
+└── rules/       ← 该角色专用规范文件（可选）
+```
+
+| Skill | 角色 | 模型 |
+|-------|------|------|
+| **manager** | 全流程编排、需求分析、Git 管理、进度汇报 | claude-opus-4-5 |
+| **spec** | 生成 OpenSpec artifacts、API 契约、任务分发 | claude-sonnet-4-5 |
+| **frontend** | React/TypeScript 前端代码实现 | claude-opus-4-5 |
+| **backend** | Go/Gin 后端代码实现 | claude-sonnet-4-5 |
+| **test** | 测试验收、生成测试报告、输出修复请求 | claude-sonnet-4-5 |
+
+**新增角色**：创建 `skills/<role>/SKILL.md` + `agent.md`，无需修改任何代码。
 
 ---
 
-## 项目目录结构
+## ⚙️ 命令参考
+
+```bash
+# 全自动流水线（plan → develop → test → fix → pref）
+chainagent run --req <id>
+
+# 并行启动前端 + 后端开发
+chainagent develop --req <id>
+
+# 启动测试 Agent 验收
+chainagent test --req <id>
+
+# 自动修复循环（fix → test → 重复，最多10轮）
+chainagent fix --req <id>
+
+# OpenSpec 策划（生成 proposal/design/tasks）
+chainagent plan --req <id>
+
+# 生成前端 HTML Demo
+chainagent demo --req <id>
+
+# 代码质量优化
+chainagent pref --req <id> --target <frontend|backend>
+
+# Bug 专项修复
+chainagent bugfix --agent <frontend|backend> --description "..."
+
+# 查看实时进度
+chainagent status [--req <id>]
+```
+
+所有命令支持 `--git-commit` 标志，执行完成后自动 git commit。
+
+---
+
+## 📋 开发流水线
 
 ```
-chainAgent/
-├── start.bat                        # Windows 一键启动
-├── start.sh                         # macOS/Linux 一键启动
-│
-├── .openspec/
-│   ├── agents/                      # Agent 定义文件（5 个）
-│   │   ├── manager.md
-│   │   ├── spec.md
-│   │   ├── frontend.md
-│   │   ├── backend.md
-│   │   └── test.md
-│   ├── orchestrator/                # 编排器
-│   │   ├── orchestrator.py          # 主入口：9 条子命令，Git 集成，JSON 结果输出
-│   │   └── agent_runner.py          # Agent 调用封装：HTTP API + 事件解析
-│   ├── prompts/                     # Prompt 工具链（8 个）
-│   │   ├── genRule.md               # 从零生成规范文件
-│   │   ├── updateRule.md            # 局部更新规范
-│   │   ├── addrule.md               # 新增规范条目
-│   │   ├── adjustRule.md            # 按模板重整规范格式
-│   │   ├── useRule.md               # 加载并遵循规范
-│   │   ├── pref.md                  # 代码优化指令（Phase 4.5）
-│   │   ├── readMe.md                # README 生成
-│   │   └── ask.md                   # 需求澄清提问
-│   ├── rules/                       # 自动生成的开发规范
-│   │   ├── frontend-rule.mdc        # 前端开发规范（含示例）
-│   │   ├── backend-rule.mdc         # 后端开发规范（含示例）
-│   │   ├── frontend-rule-template.md # 前端规范模板
-│   │   └── backend-rule-template.md  # 后端规范模板
-│   └── logs/                        # 运行日志（自动生成）
-│
-├── backend/
-│   ├── server.py                    # FastAPI 主服务（含 WebSocket 监控、LangGraph 兼容）
-│   ├── graph.py                     # LangGraph 多 Agent 状态图
-│   └── tests/                       # 后端测试（pytest）
-│
-├── frontend/
-│   ├── package.json                 # pnpm 管理
-│   └── src/
-│       ├── app/                     # Next.js App Router
-│       ├── components/
-│       │   ├── chain-agent/         # 多 Agent 监控 UI（11 个文件）
-│       │   │   ├── ChainAgentProvider.tsx  # WebSocket 连接管理、状态聚合、事件分发
-│       │   │   ├── AgentSidebar.tsx        # Agent 状态、当前步骤、token 消耗、最近日志
-│       │   │   ├── PipelinePanel.tsx       # 可视化流水线进度（含时间轴）
-│       │   │   ├── TaskPanel.tsx           # 当前活跃任务子任务列表和日志详情
-│       │   │   ├── ReqSwitcher.tsx         # 多需求切换
-│       │   │   ├── ModelSelector.tsx       # 模型选择器
-│       │   │   ├── AgentLogOverlay.tsx     # Agent 日志浮层
-│       │   │   ├── TabBar.tsx              # 标签页导航
-│       │   │   ├── utils.ts                # 工具函数
-│       │   │   └── types.ts                # 类型定义
-│       │   ├── thread/              # 会话线程 UI
-│       │   ├── icons/               # 图标
-│       │   └── ui/                  # shadcn/ui 基础组件
-│       ├── hooks/                   # 自定义 Hooks
-│       ├── lib/                     # 工具库
-│       └── providers/               # LangGraph 客户端 Provider
-│
-├── openspec/
-│   ├── config.yaml
-│   └── changes/                     # 每个需求的 artifacts（已有 13 个 req）
-│       └── req-<id>/
-│           ├── proposal.md
-│           ├── specs/<capability>/spec.md
-│           ├── design.md
-│           ├── tasks.md
-│           ├── frontend-report.md   # 前端开发报告
-│           ├── backend-report.md    # 后端开发报告
-│           └── report.md            # 项目完成报告（7 章节）
-│
-├── docs/
-│   ├── requirements/REQ-<id>.md     # 需求文档
-│   └── contracts/api-req-<id>.yaml  # OpenAPI 3.0 API 契约
-│
-├── inbox/                           # Agent 间通信目录
-│   ├── frontend/TASK-<id>.md        # 前端任务分发
-│   ├── backend/TASK-<id>.md         # 后端任务分发
-│   └── test/DONE-*.md               # 开发完成信号
-│
-├── reports/                         # 测试和流程报告
-│   ├── test-report-<id>.md          # QA 测试报告
-│   └── fix-requests/                # 修复请求文件
-│
-└── .orchestrator/                   # 运行时状态（自动生成）
-    ├── live.json                    # 实时 Agent 活动状态
-    ├── bugs/                        # BUG-<seq>.status.json（bug 修复状态）
-    └── streams/                     # Agent 输出流缓存
+阶段 1：需求沟通 → Spec Agent 生成 artifacts → 用户确认
+阶段 2：Frontend + Backend 并行开发（chainagent develop）
+阶段 3：Test Agent 验收测试（chainagent test）
+阶段 4：失败则循环修复（chainagent fix），最多 10 轮
+阶段 4.5：代码质量优化（chainagent pref）
 ```
 
 ---
 
-## 开发规范体系
+## 🔑 环境要求
 
-ChainAgent 通过 Spec Agent 自动生成和维护两份开发规范文件，确保 Frontend/Backend Agent 的输出质量一致。
-
-### 规范文件
-
-| 文件 | 覆盖范围 |
-|---|---|
-| `.openspec/rules/frontend-rule.mdc` | React 组件结构、TypeScript 用法、API 调用规范、状态管理、样式规范 |
-| `.openspec/rules/backend-rule.mdc` | FastAPI 路由规范、异步编程、Pydantic 模型、错误处理、数据库操作 |
-
-每条规范包含 ✅ 正确示例和 ❌ 错误示例，代码精简不超过 20 行，注释全部使用中文。
-
-### Prompt 工具链
-
-| Prompt | 用途 | 触发时机 |
-|---|---|---|
-| `genRule.md` | 扫描代码库从零生成规范 | 首次初始化（Phase 0.5）|
-| `updateRule.md` | 局部更新指定章节 | 测试发现 bug 后自动触发 |
-| `addrule.md` | 插入新规范条目 | 发现新错误模式 |
-| `adjustRule.md` | 按模板重整格式 | 规范文件格式混乱时 |
-| `useRule.md` | 加载规范供 Agent 遵循 | 每次开发任务开始前 |
-| `pref.md` | 代码质量优化指令 | Phase 4.5 代码优化 |
-
-**自动更新机制**：当 Test Agent 发现 bug 并产出修复请求时，Manager 同步 spawn Spec Agent 分析错误模式，将防止同类问题的规范条目更新到对应规范文件，下一轮开发时自动生效。
+| 依赖 | 版本要求 | 必选 |
+|------|---------|------|
+| Go | >= 1.22 | ✅（编译 / go install） |
+| Node.js | >= 18 | ✅（claude CLI / opencli） |
+| claude CLI | 最新版 | ✅ |
+| opencli | 最新版 | ✅（提供 openspec 命令） |
 
 ---
 
-## Web UI 实时监控
+## 📄 许可证
 
-### WebSocket 端点
-
-`ws://localhost:2024/ws/monitor` — 全局监控通道，连接后立即推送全量快照，随后持续推送增量事件：
-
-| 事件类型 | 内容 |
-|---|---|
-| `snapshot` | 全量状态快照（req_states）|
-| `agent_status` | Agent 任务状态变更（来自 live.json 轮询）|
-| `agent_token` | 实时 token 流（来自 openspec serve SSE）|
-| `pipeline_phase` | 流水线阶段状态推断结果 |
-| `ping` | 30 秒保活心跳 |
-
-### 前端监控组件（chain-agent/）
-
-| 组件 | 职责 |
-|---|---|
-| `ChainAgentProvider` | WebSocket 连接管理、状态聚合、事件分发 |
-| `AgentSidebar` | 显示各 Agent 状态、当前步骤、token 消耗、最近日志 |
-| `PipelinePanel` | 可视化 9 阶段流水线进度（含时间轴）|
-| `TaskPanel` | 展示当前活跃任务的子任务列表和日志详情 |
-| `ReqSwitcher` | 多需求切换，查看不同 REQ 的进度 |
-| `ModelSelector` | 模型选择器 |
-| `AgentLogOverlay` | Agent 日志浮层，支持全屏查看 |
-| `TabBar` | 标签页导航 |
-
-### LangGraph 兼容接口
-
-后端实现了完整的 LangGraph SDK 协议，前端可直接使用 `@langchain/langgraph-sdk` 对接：
-
-| 接口 | 说明 |
-|---|---|
-| `GET /info` | Server 信息，含 assistants 列表 |
-| `POST /threads` | 创建会话 |
-| `GET /threads/{id}` | 获取会话详情 |
-| `GET /threads` | 获取会话列表 |
-| `POST /runs/stream` | 流式运行（SSE，兼容 LangGraph stream_mode）|
-| `WS /ws/monitor` | 实时监控广播通道 |
-
----
-
-## 日志与调试
-
-### 日志位置
-
-| 日志文件 | 内容 |
-|---|---|
-| `.openspec/logs/openspec-serve.log` | openspec serve 服务日志 |
-| `.openspec/logs/backend.log` | FastAPI 后端日志 |
-| `.openspec/logs/frontend.log` | Next.js 前端日志 |
-
-### 终端彩色输出
-
-orchestrator.py 运行时实时输出结构化日志：
-
-```
-[18:30:01] >  启动 openspec serve (port=4096)...
-[18:30:02] +  openspec serve 就绪: http://127.0.0.1:4096
-
-[frontend] ▶ Step 1
-[frontend]   ⚡ bash: 创建组件目录结构 (1200ms)
-[frontend]   📝 edit: UserTable.tsx (820ms)
-[frontend]   └ step: in:1200 out:450 | $0.0023
-
-[backend]  ▶ Step 1
-[backend]   ⚡ bash: 初始化 API 路由 (2100ms)
-```
-
-- `[frontend]` 黄色 / `[backend]` 紫色 / `[test]` 绿色 / `[manager]` 青色
-- `⚡ bash` / `📝 edit` / `🔍 grep` / `📖 read` — 工具调用类型和耗时
-- `└ step:` — 当前步骤的 token 消耗和费用
-
-### 状态持久化
-
-`.orchestrator/live.json` 实时记录所有 Agent 的运行状态（步骤、token、耗时），后端每 2 秒轮询并通过 WebSocket 广播变更，支持断点查看和 Dashboard 展示。Bug 修复流水线的每个 Bug 状态持久化于 `.orchestrator/bugs/BUG-<seq>.status.json`。
-
----
-
-## License
-
-MIT
-
-## 致谢
-
-- [openspec](https://openspec..com) — AI 编程助手，提供 Agent 驱动底层
-- [OpenSpec](https://openspec.dev) — 规范驱动开发工作流
-- [LangGraph](https://github.com/langchain-ai/langgraph) — 多 Agent 状态图框架
-- [agent-chat-ui](https://github.com/langchain-ai/agent-chat-ui) — 前端 UI 基础框架
+MIT License — 详见 [LICENSE](./LICENSE)
