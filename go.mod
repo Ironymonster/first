@@ -1,4 +1,4 @@
-module github.com/chainagent/chainagent
+module github.com/Ironymonster/chainAgent
 
 go 1.22
 
