@@ -1,3 +1,17 @@
+// Package main 是 chainagent 命令行工具的入口。
+//
+// chainagent 通过 cobra 提供以下子命令：
+//
+//	plan     — 启动 OpenSpec 策划（Phase 1）
+//	develop  — 并行启动前端 + 后端开发（Phase 2）
+//	test     — 启动 Test Agent 验收测试（Phase 3）
+//	fix      — 启动自动修复循环（Phase 4）
+//	pref     — 代码质量优化（Phase 5）
+//	run      — 一键运行全自动流水线（Phase 1-5）
+//	demo     — 生成前端 HTML Demo 页面
+//	bugfix   — 针对性 Bug 修复（B 流）
+//	status   — 查看流水线进度
+//	worktree — 管理 git worktree 隔离工作区
 package main
 
 import (
@@ -18,8 +32,8 @@ func main() {
 	}
 }
 
-// projectRoot returns the directory containing skills/ by walking up from the
-// current working directory. Falls back to cwd if not found.
+// projectRoot 从当前工作目录向上逐级查找包含 skills/ 目录的路径，作为项目根目录。
+// 若一直找到文件系统根目录仍未找到，则回退使用当前工作目录。
 func projectRoot() string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -70,6 +84,7 @@ func rootCmd() *cobra.Command {
 		prefCmd(),
 		bugfixCmd(),
 		statusCmd(),
+		worktreeCmd(),
 	)
 
 	return root
@@ -240,6 +255,7 @@ func runCmd() *cobra.Command {
 
 func demoCmd() *cobra.Command {
 	var reqID, title string
+	var gitCommit bool
 
 	cmd := &cobra.Command{
 		Use:   "demo",
@@ -249,11 +265,19 @@ func demoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return o.RunDemo(context.Background(), reqID, title)
+			ctx := context.Background()
+			if err := o.RunDemo(ctx, reqID, title); err != nil {
+				return err
+			}
+			if gitCommit {
+				return o.GitCommit(fmt.Sprintf("demo: REQ-%s Demo 页面生成", reqID))
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&reqID, "req", "", "需求 ID（必选）")
 	cmd.Flags().StringVar(&title, "title", "", "需求标题（可选）")
+	cmd.Flags().BoolVar(&gitCommit, "git-commit", false, "完成后自动 git commit")
 	_ = cmd.MarkFlagRequired("req")
 	return cmd
 }
@@ -262,6 +286,7 @@ func demoCmd() *cobra.Command {
 
 func prefCmd() *cobra.Command {
 	var reqID, target, title string
+	var gitCommit bool
 
 	cmd := &cobra.Command{
 		Use:   "pref",
@@ -274,12 +299,20 @@ func prefCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return o.RunPref(context.Background(), reqID, target, title)
+			ctx := context.Background()
+			if err := o.RunPref(ctx, reqID, target, title); err != nil {
+				return err
+			}
+			if gitCommit {
+				return o.GitCommit(fmt.Sprintf("pref: REQ-%s %s 代码优化完成", reqID, target))
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&reqID, "req", "", "需求 ID（必选）")
 	cmd.Flags().StringVar(&target, "target", "", "优化目标：frontend 或 backend（必选）")
 	cmd.Flags().StringVar(&title, "title", "", "需求标题（可选）")
+	cmd.Flags().BoolVar(&gitCommit, "git-commit", false, "完成后自动 git commit")
 	_ = cmd.MarkFlagRequired("req")
 	_ = cmd.MarkFlagRequired("target")
 	return cmd
@@ -288,7 +321,8 @@ func prefCmd() *cobra.Command {
 // ── bugfix ────────────────────────────────────────────────────────────────────
 
 func bugfixCmd() *cobra.Command {
-	var agentRole, description string
+	var agentRole, description, worktreeName string
+	var gitCommit bool
 
 	cmd := &cobra.Command{
 		Use:   "bugfix",
@@ -298,11 +332,20 @@ func bugfixCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return o.RunBugfix(context.Background(), agentRole, description)
+			ctx := context.Background()
+			if err := o.RunBugfix(ctx, agentRole, description, worktreeName); err != nil {
+				return err
+			}
+			if gitCommit {
+				return o.GitCommit(fmt.Sprintf("fix(%s): %s", agentRole, description))
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&agentRole, "agent", "", "Agent 角色：frontend 或 backend（必选）")
 	cmd.Flags().StringVar(&description, "description", "", "Bug 描述（必选）")
+	cmd.Flags().StringVar(&worktreeName, "worktree", "", "Worktree 名称，如 fix-bug-001（可选，默认在项目根目录运行）")
+	cmd.Flags().BoolVar(&gitCommit, "git-commit", false, "完成后自动 git commit")
 	_ = cmd.MarkFlagRequired("agent")
 	_ = cmd.MarkFlagRequired("description")
 	return cmd
@@ -350,6 +393,89 @@ func statusCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&reqID, "req", "", "需求 ID（不填则列出所有）")
 	return cmd
+}
+
+// ── worktree ──────────────────────────────────────────────────────────────────
+
+func worktreeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "worktree",
+		Short: "管理 git worktree 隔离工作区",
+	}
+	cmd.AddCommand(worktreeSetupCmd(), worktreeRemoveCmd(), worktreeListCmd())
+	return cmd
+}
+
+func worktreeSetupCmd() *cobra.Command {
+	var name string
+	cmd := &cobra.Command{
+		Use:   "setup",
+		Short: "为任务创建隔离 worktree（如 req-001、fix-login）",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			o, err := newOrchestrator()
+			if err != nil {
+				return err
+			}
+			path, err := o.SetupWorktree(name)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("✅ worktree 已就绪: %s\n", path)
+			fmt.Printf("   切换目录后可直接运行开发命令，无需额外参数\n")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "任务名称，如 req-001 或 fix-login（必选）")
+	_ = cmd.MarkFlagRequired("name")
+	return cmd
+}
+
+func worktreeRemoveCmd() *cobra.Command {
+	var name string
+	cmd := &cobra.Command{
+		Use:   "remove",
+		Short: "删除任务 worktree（MR 合并后清理）",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			o, err := newOrchestrator()
+			if err != nil {
+				return err
+			}
+			if err := o.RemoveWorktree(name); err != nil {
+				return err
+			}
+			fmt.Printf("✅ worktree 已删除: %s\n", name)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "任务名称（必选）")
+	_ = cmd.MarkFlagRequired("name")
+	return cmd
+}
+
+func worktreeListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "列出所有活跃的 worktree",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			o, err := newOrchestrator()
+			if err != nil {
+				return err
+			}
+			names, err := o.ListWorktrees()
+			if err != nil {
+				return err
+			}
+			if len(names) == 0 {
+				fmt.Println("暂无活跃的 worktree")
+				return nil
+			}
+			fmt.Println("活跃的 worktree：")
+			for _, n := range names {
+				fmt.Printf("  • %s  →  .worktrees/%s\n", n, n)
+			}
+			return nil
+		},
+	}
 }
 
 func printStatus(s *status.PipelineStatus) {
