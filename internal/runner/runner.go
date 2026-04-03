@@ -14,8 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/chainagent/chainagent/internal/skill"
-	"github.com/chainagent/chainagent/internal/status"
+	"github.com/Ironymonster/chainAgent/internal/skill"
+	"github.com/Ironymonster/chainAgent/internal/status"
 )
 
 // ── ANSI colors ───────────────────────────────────────────────────────────────
