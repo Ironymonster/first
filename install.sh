@@ -35,18 +35,15 @@ else
   echo "✅ claude CLI 安装完成"
 fi
 
-# ── 安装 opencli（必选，提供 openspec CLI）──
-echo "[3/3] 安装 opencli（必选，提供 openspec 命令）..."
-if command -v opencli &>/dev/null && command -v openspec &>/dev/null; then
-  OPENCLI_VER=$(opencli --version 2>&1 | head -1)
-  echo "✅ opencli 已安装：$OPENCLI_VER"
+# ── 安装 OpenSpec CLI ──
+echo "[3/3] 安装 OpenSpec CLI..."
+if command -v openspec &>/dev/null; then
+  OPENSPEC_VER=$(openspec --version 2>&1 | head -1)
+  echo "✅ openspec 已安装：$OPENSPEC_VER"
 else
-  echo "   正在安装 opencli（包含 openspec CLI）..."
-  npm install -g opencli
-  echo "✅ opencli 安装完成"
-  echo ""
-  echo "⚠️  请运行以下命令完成登录（OpenSpec 功能必须）："
-  echo "   opencli login"
+  echo "   正在安装 @fission-ai/openspec ..."
+  npm install -g @fission-ai/openspec@latest
+  echo "✅ openspec 安装完成"
 fi
 
 echo ""
@@ -57,7 +54,7 @@ echo ""
 echo "后续步骤："
 echo "  1. 运行 'claude login' 完成 Claude 账号授权"
 echo "  2. 安装 chainagent binary："
-echo "     go install github.com/chainagent/cmd/chainagent@latest"
+echo "     go install github.com/chainagent-oss/chainagent/cmd/chainagent@latest"
 echo "  3. 将 ChainAgent 复制到你的项目目录中，然后执行："
 echo "     chainagent run --req 001"
 echo ""
