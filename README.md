@@ -25,7 +25,7 @@ npm install -g @fission-ai/openspec@latest
 ### 2. 安装 chainagent
 
 ```bash
-go install github.com/chainagent/chainagent/cmd/chainagent@latest
+go install github.com/Ironymonster/chainAgent/cmd/chainagent@latest
 ```
 
 或使用一键安装脚本（macOS / Linux）：
