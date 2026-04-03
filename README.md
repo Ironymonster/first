@@ -139,14 +139,28 @@ claude -p "<任务 prompt>" \
 Manager Agent 作为总调度，由编排器首先启动，再根据流水线阶段自动调度 Spec、Frontend、Backend、Test 等子 Agent。
 
 
-## 📋 开发流水线
+## 📋 开发需求流水线 (Feature Pipeline)
 
 ```
+阶段 0：环境检查 & Git 分支准备
+阶段 0.5：初始化开发规范（Rules Init，每个项目只需一次）
 阶段 1：需求沟通 → Spec Agent 生成 artifacts → 用户确认
 阶段 2：Frontend + Backend 并行开发（chainagent develop）
 阶段 3：Test Agent 验收测试（chainagent test）
 阶段 4：失败则循环修复（chainagent fix），最多 10 轮
 阶段 4.5：代码质量优化（chainagent pref）
+阶段 5：完成汇报，生成 report.md
+```
+
+## 🐛 Bug 修复流水线 (Bug Fix Pipeline)
+
+```
+阶段 B0：复现 & 定位（分析日志、读取源码、确认根因）
+阶段 B1：Spec Agent 生成修复方案（proposal → design → tasks）
+阶段 B2：Frontend / Backend Agent 执行修复（按需单独或并行）
+阶段 B3：Test Agent 验收测试
+阶段 B4：失败则循环修复，最多 10 轮
+阶段 B5：规范沉淀（将 bug 根因写入 rules），完成汇报
 ```
 
 ---
