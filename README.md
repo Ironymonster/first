@@ -14,13 +14,12 @@ ChainAgent 是一个开箱即用的多 Agent 协作开发框架，通过 `claude
 # 安装 Go >= 1.22
 # https://go.dev/dl/
 
-# 安装 Claude CLI
+# 安装 Claude CLI，https://www.npmjs.com/package/@anthropic-ai/claude-code
 npm install -g @anthropic-ai/claude-code
 claude login
 
-# 安装 opencli（提供 openspec 命令，OpenSpec 工作流必须）
-npm install -g opencli
-opencli login
+# 安装 OpenSpec CLI（OpenSpec 工作流必须），参考：https://github.com/Fission-AI/OpenSpec
+npm install -g @fission-ai/openspec@latest
 ```
 
 ### 2. 安装 chainagent
@@ -40,6 +39,8 @@ bash install.sh
 将 ChainAgent 的 `skills/`、`prompts/`、`openspec/` 目录复制到你的项目根目录，然后执行：
 
 ```bash
+cd your-project
+openspec init
 # 全自动流水线
 chainagent run --req 001
 ```
@@ -161,9 +162,9 @@ chainagent status [--req <id>]
 | 依赖 | 版本要求 | 必选 |
 |------|---------|------|
 | Go | >= 1.22 | ✅（编译 / go install） |
-| Node.js | >= 18 | ✅（claude CLI / opencli） |
+| Node.js | >= 18 | ✅（claude CLI / openspec） |
 | claude CLI | 最新版 | ✅ |
-| opencli | 最新版 | ✅（提供 openspec 命令） |
+| openspec | 最新版 | ✅（`@fission-ai/openspec`） |
 
 ---
 
