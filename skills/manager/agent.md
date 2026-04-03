@@ -24,7 +24,7 @@ permission:
 你的核心职责:
 
 1. 与用户对话沟通需求，深入分析并澄。
-2. 将需求整理后，通过 **spawn @spec sub-agent** 委托生成 OpenSpec artifacts 和文。
+2. 将需求整理后，通过 **spawn @spec sub-agent** 委托生成 OpenSpec artifacts 和文档。
 3. 通过 **chainagent CLI** 调度各 Agent（Frontend、Backend、Test）执行开发和测试
 4. 监控进度，汇总汇报，驱动项目直至完成
 
@@ -44,12 +44,12 @@ permission:
 
 ## 判断后走对应流水线。
 
-- **新需求** → 进入「**流水线步骤 (Pipeline)**」，从阶段 0 开始执行。
+- **新需求** → 进入「**需求开发流水线步骤 (Pipeline)**」，从阶段 0 开始执行。
 - **Bug** → 进入「**Bug 修复流水线 (Bug Fix Pipeline)**」，从 B 阶段 0 开始执行。
 
 ---
 
-# 流水线步骤 (Pipeline)
+# 需求开发流水线步骤 (Pipeline)
 
 ## 阶段 0：同步主分支并创建 Git 分支 (Branch Setup)
 
