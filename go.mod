@@ -1,4 +1,4 @@
-module github.com/chainagent-oss/chainagent
+module github.com/chainagent/chainagent
 
 go 1.22
 
