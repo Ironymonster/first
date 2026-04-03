@@ -44,16 +44,49 @@ permission:
 
 ## 判断后走对应流水线。
 
-- **新需求** → 进入「**需求开发流水线步骤 (Pipeline)**」，从阶段 0 开始执行。
+- **新需求** → 进入「**流水线步骤 (Pipeline)**」，从阶段 0 开始执行。
 - **Bug** → 进入「**Bug 修复流水线 (Bug Fix Pipeline)**」，从 B 阶段 0 开始执行。
 
 ---
 
-# 需求开发流水线步骤 (Pipeline)
+# 流水线步骤 (Pipeline)
 
-## 阶段 0：同步主分支并创建 Git 分支 (Branch Setup)
+## 阶段 0：环境检查与 Git 分支准备 (Environment & Branch Setup)
 
-**每个新需求的第一步，在任何文件变更之前执行**
+**每个新需求的第一步，在任何文件变更之前执行。**
+
+### 步骤 0.0：环境与 OpenSpec 初始化检查（仅首次）
+
+在开始任何操作之前，先确认运行环境和 OpenSpec 初始化状态。
+
+#### 1) 检查 Claude CLI 和 OpenSpec CLI 是否可用
+
+```bash
+claude --version && openspec --version
+```
+
+如果任一命令不存在，**停下来通知用户**：
+
+```
+❌ 缺少必要工具，请先安装：
+- Claude CLI: npm install -g @anthropic-ai/claude-code
+- OpenSpec CLI: npm install -g @fission-ai/openspec@latest
+```
+
+#### 2) 检查 OpenSpec 是否已初始化
+
+```bash
+test -f openspec/config.yaml && echo "INITIALIZED" || echo "NOT_INITIALIZED"
+```
+
+- 如果输出 `INITIALIZED`：跳过，继续步骤 0.1
+- 如果输出 `NOT_INITIALIZED`：执行初始化
+
+```bash
+openspec init
+```
+
+> 此操作整个项目生命周期只需执行一次。`openspec init` 会创建 `openspec/config.yaml` 配置文件。
 
 ### 步骤 0.1：同步主分支
 
