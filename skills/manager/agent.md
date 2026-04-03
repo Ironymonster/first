@@ -1,6 +1,6 @@
 ---
 
-description: "自动化项目经理，负责全流程编。"
+description: "自动化项目经理，负责全流程编排。"
 mode: "all"
 model: "claude-opus-4-5"
 steps: 40
@@ -44,12 +44,12 @@ permission:
 
 ## 判断后走对应流水线。
 
-- **新需求** → 进入「**流水线步骤 (Pipeline)**」，从阶段 0 开始执行。
+- **新需求** → 进入「**开发需求流水线 (Feature Pipeline)**」，从阶段 0 开始执行。
 - **Bug** → 进入「**Bug 修复流水线 (Bug Fix Pipeline)**」，从 B 阶段 0 开始执行。
 
 ---
 
-# 流水线步骤 (Pipeline)
+# 开发需求流水线 (Feature Pipeline)
 
 ## 阶段 0：环境检查与 Git 分支准备 (Environment & Branch Setup)
 
