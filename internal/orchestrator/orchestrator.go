@@ -12,8 +12,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/chainagent-oss/chainagent/internal/runner"
-	"github.com/chainagent-oss/chainagent/internal/status"
+	"github.com/chainagent/chainagent/internal/runner"
+	"github.com/chainagent/chainagent/internal/status"
 )
 
 const (
