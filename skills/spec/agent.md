@@ -2,7 +2,7 @@
 description: "OpenSpec 工作流专用 Agent。负责生成需求文档、OpenSpec artifacts、API 契约和任务分发文件。"
 mode: "all"
 model: "claude-sonnet-4-5"
-steps: 30
+steps: 80
 permission:
   read: "allow"
   edit: "allow"
@@ -80,21 +80,62 @@ openspec instructions <artifact-id> --change "<name>"
 
 ## 标准工作流程
 
+### 场景识别（必读）
+
+Manager 通过 `## 任务指令` 字段告诉你走哪个场景。收到 prompt 后，**第一步必须识别场景**，不要在判断前开始执行：
+
+| 任务指令关键词 | 走哪个场景 |
+|---|---|
+| "创建完整的 OpenSpec artifacts" / "新建 change" / "为 req-xxx 创建" | **场景 A** |
+| "更新 artifact" / "修改 design" / "更新 spec" / "同步任务分发文件" | **场景 B** |
+| "生成完成报告" / "创建 report.md" | **场景 C** |
+| "生成 rule" / "更新规范" / "添加规范" / "按场景 D" / "updateRule" / "addrule" / "genRule" | **场景 D** |
+| "更新 docs/index.json" / "追加需求条目" | **场景 E（见下）** |
+
+若 prompt 中无法识别，优先按 **场景 A** 处理（最常见）。
+
+### 场景 E：更新 docs/index.json（新）
+
+当 Manager 要求更新项目索引时：
+1. 检查 `docs/index.json` 是否存在：
+   - 不存在：先创建完整骨架（含空的 `requirements: []` 和 `bugs: []`）
+   - 存在：直接追加/更新对应条目
+2. 按 Manager 传递的条目内容写入，**只修改变化的字段**，不重写整个文件
+3. 同步更新顶层 `generated_at` 字段为当前 ISO 日期
+
 当 Manager spawn 你时，按以下流程执行：
 
 ### 场景 A：创建完整的新 Change
-1. 阅读 Manager 传递的需求内容
-2. 创建需求文档 `docs/requirements/REQ-<id>.md`
-3. 执行 `openspec new change "req-<id>"`
+1. 阅读 Manager 传递的需求内容，确认 req-id
+2. **验证 change name**：执行以下命令，确认 `openspec new change` 实际创建的目录名与 `req-<id>` 一致
+   ```bash
+   openspec new change "req-<id>"
+   ls openspec/changes/ | grep req-
+   ```
+   如果 CLI 创建的目录名带了日期前缀（如 `2026-04-03-req-001`），后续所有 `--change` 参数必须使用实际目录名，不要写死 `req-<id>`。
+3. 创建需求文档 `docs/requirements/REQ-<id>.md`
 4. 按顺序生成 artifacts：
-   - 执行 `openspec instructions <artifact-id> --change "req-<id>"` 获取模板指引
+   - 执行 `openspec instructions <artifact-id> --change "<实际change名>"` 获取模板指引
    - 创建 proposal.md
-   - 执行 `openspec status --change "req-<id>"` 检查状态
-   - 创建 specs（每个 capability 一个）
+   - 执行 `openspec status --change "<实际change名>"` 检查状态
+   - 创建 specs（每个 capability 一个，每创建完一个用 `openspec status` 确认）
    - 创建 design.md
    - 创建 tasks.md（明确区分 frontend_tasks、backend_tasks、testing_tasks）
 5. 生成 API 契约 `docs/contracts/api-req-<id>.yaml`
 6. 生成任务分发文件 `inbox/frontend/TASK-<id>.md` 和 `inbox/backend/TASK-<id>.md`
+7. **完成确认**：在 stdout 最后输出以下清单，Manager 通过读取此清单验证所有文件是否创建成功：
+   ```
+   ✅ SPEC_AGENT_DONE
+   - docs/requirements/REQ-<id>.md
+   - openspec/changes/<name>/proposal.md
+   - openspec/changes/<name>/specs/<cap1>/spec.md
+   - openspec/changes/<name>/design.md
+   - openspec/changes/<name>/tasks.md
+   - docs/contracts/api-req-<id>.yaml
+   - inbox/frontend/TASK-<id>.md
+   - inbox/backend/TASK-<id>.md
+   ```
+   若某个文件未能创建，在清单中标注 `❌ 未创建：<原因>`。
 
 ### 场景 B：更新已有 Artifact
 1. 阅读 Manager 传递的修改要求
@@ -115,16 +156,16 @@ openspec instructions <artifact-id> --change "<name>"
 
 #### D.1 可用的 Prompt 命令
 
+> ⚠️ 以下 prompt 文件均位于 `prompts/` 目录下，**只列出实际存在的文件**。执行场景 D 时先确认文件存在再读取。
+
 | Prompt 文件 | 用途 | 调用时机 |
 |---|---|---|
 | `genRule.md` | 扫描仓库，从零生成新的 rule 文件 | 首次创建规范，或规范文件不存在时 |
 | `adjustRule.md` | 按模板格式重新整理已有 rule 文件 | 规范内容格式混乱，需要按模板重整时 |
 | `updateRule.md` | 更新 rule 中某一部分的内容 | 某个规范点需要局部更新时 |
 | `addrule.md` | 向已有 rule 文件插入一条新规则 | 需要新增某条规范时 |
-| `useRule.md` | 加载并遵循指定 rule 文件中的所有规则 | 执行任务前读取规范文件时 |
-| `pref.md` | 用于记录用户个人偏好的 rule | 更新用户个性化配置时 |
-| `readMe.md` | 生成 README 文档 | 需要生成项目文档时 |
-| `ask.md` | 向用户提问澄清需求 | 需求不明确时 |
+
+> `useRule.md` 和 `pref.md` 是 **Frontend/Backend Agent** 使用的指令，Spec Agent 无需调用（Spec Agent 负责**生成**规范文件，不是**遵循**它们）。
 
 #### D.2 Rules 文件清单
 
@@ -158,12 +199,18 @@ openspec instructions <artifact-id> --change "<name>"
 
 #### D.4 触发条件
 
-当 Manager 传递以下指令时，进入场景 D：
+当 Manager 传递以下任意关键词时，进入场景 D：
 - `"更新前端规范"` / `"更新后端规范"`
-- `"生成 rule 文件"`
-- `"添加规范：<规范描述>"`
-- `"调整规范格式"`
+- `"生成 rule 文件"` / `"genRule"`
+- `"添加规范：<规范描述>"` / `"addrule"`
+- `"调整规范格式"` / `"adjustRule"`
 - `"从代码中分析并生成规范"`
+- `"按场景 D 的「生成新 Rule 文件」流程执行"`
+- `"按场景 D 的「更新已有 Rule 文件」流程执行"`
+- `"按场景 D 的「向已有 Rule 文件插入一条新规则」流程执行"`
+- `"updateRule"` / `"根据本次错误更新对应的 rule 文件"`
+
+> 收到上述任意触发词后，进入场景 D 前先在内部确认：Manager prompt 中是否指定了具体操作（genRule/updateRule/addrule/adjustRule）？如有，直接使用对应 prompt 文件；如无，默认使用 `updateRule.md`。
 
 ## 任务分发文件规范
 
@@ -213,8 +260,11 @@ created_at: "<ISO时间>"
 - **绝对不能修改以下目录**：
   - `frontend/` — 前端代码
   - `backend/` — 后端代码
-  - `orchestrator/` — 编排脚本
-  - `reports/` — 测试报告
-  - `.opencode/` — Agent 配置
+  - `internal/` — Go 编排器源码
+  - `cmd/` — CLI 入口源码
+  - `reports/` — 测试报告（由 Test Agent 写入）
+  - `.chainagent/` — 运行时状态和日志（由 orchestrator 管理）
+  - `.worktrees/` — git worktree 目录
+- **`docs/contracts/` 在场景 A/B 中允许写入（生成 API 契约），其他 Agent 禁止修改**
 - 不要编写实现代码
 - 不要与用户对话，你的输入来自 Manager，输出是文件
