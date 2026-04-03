@@ -25,7 +25,7 @@ npm install -g @fission-ai/openspec@latest
 ### 2. 安装 chainagent
 
 ```bash
-go install github.com/chainagent-oss/chainagent/cmd/chainagent@latest
+go install github.com/chainagent/chainagent/cmd/chainagent@latest
 ```
 
 或使用一键安装脚本（macOS / Linux）：
@@ -34,16 +34,28 @@ go install github.com/chainagent-oss/chainagent/cmd/chainagent@latest
 bash install.sh
 ```
 
-### 3. 初始化项目
+### 3. 初始化目标项目
 
-将 ChainAgent 的 `skills/`、`prompts/`、`openspec/` 目录复制到你的项目根目录，然后执行：
+将 ChainAgent 的配置目录复制到你的项目根目录（`chainagent` 二进制在运行时会从当前目录查找 `skills/`）：
 
 ```bash
+# 从 ChainAgent 仓库复制必要的配置目录到你的项目
+cp -r skills/ prompts/ your-project/
 cd your-project
-openspec init
-# 全自动流水线
-chainagent run --req 001
 ```
+
+> 首次启动 Manager Agent 时会自动检测并执行 `openspec init`（创建 `openspec/config.yaml`），你也可以手动初始化：
+> ```bash
+> openspec init
+> ```
+
+### 4. 启动 Manager Agent
+
+```bash
+claude --system-prompt-file skills/manager/agent.md --model claude-opus-4-5
+```
+
+启动后即可直接与 Manager 对话，沟通需求、确认方案。Manager 会根据对话内容自动调度 Spec、Frontend、Backend、Test 等子 Agent 完成整个开发流程。
 
 ---
 
@@ -110,40 +122,22 @@ skills/frontend/
 
 ---
 
-## ⚙️ 命令参考
+## ⚙️ 运行原理与命令参考
+
+### 运行原理
+
+ChainAgent 通过 Go 编排器调用 `claude` CLI 子进程来驱动各 Agent。每次执行命令时，底层实际调用：
 
 ```bash
-# 全自动流水线（plan → develop → test → fix → pref）
-chainagent run --req <id>
-
-# 并行启动前端 + 后端开发
-chainagent develop --req <id>
-
-# 启动测试 Agent 验收
-chainagent test --req <id>
-
-# 自动修复循环（fix → test → 重复，最多10轮）
-chainagent fix --req <id>
-
-# OpenSpec 策划（生成 proposal/design/tasks）
-chainagent plan --req <id>
-
-# 生成前端 HTML Demo
-chainagent demo --req <id>
-
-# 代码质量优化
-chainagent pref --req <id> --target <frontend|backend>
-
-# Bug 专项修复
-chainagent bugfix --agent <frontend|backend> --description "..."
-
-# 查看实时进度
-chainagent status [--req <id>]
+claude -p "<任务 prompt>" \
+  --system-prompt-file skills/<role>/agent.md \
+  --model <SKILL.md 中配置的模型> \
+  --output-format stream-json \
+  --dangerously-skip-permissions
 ```
 
-所有命令支持 `--git-commit` 标志，执行完成后自动 git commit。
+Manager Agent 作为总调度，由编排器首先启动，再根据流水线阶段自动调度 Spec、Frontend、Backend、Test 等子 Agent。
 
----
 
 ## 📋 开发流水线
 
