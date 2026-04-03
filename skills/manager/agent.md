@@ -59,18 +59,40 @@ permission:
 
 在开始任何操作之前，先确认运行环境和 OpenSpec 初始化状态。
 
-#### 1) 检查 Claude CLI 和 OpenSpec CLI 是否可用
+#### 1) 检查 Git、Claude CLI 和 OpenSpec CLI 是否可用
 
 ```bash
-claude --version && openspec --version
+git --version && claude --version && openspec --version
 ```
 
 如果任一命令不存在，**停下来通知用户**：
 
 ```
 ❌ 缺少必要工具，请先安装：
+- Git: https://git-scm.com/downloads
 - Claude CLI: npm install -g @anthropic-ai/claude-code
 - OpenSpec CLI: npm install -g @fission-ai/openspec@latest
+```
+
+#### 2) 检查当前目录是否已初始化 Git 仓库
+
+```bash
+git rev-parse --git-dir 2>/dev/null && echo "GIT_OK" || echo "NOT_A_GIT_REPO"
+```
+
+- 如果输出 `GIT_OK`：继续下一步
+- 如果输出 `NOT_A_GIT_REPO`：自动执行初始化：
+
+```bash
+git init
+git add -A
+git commit -m "chore: init repository"
+```
+
+初始化完成后通知用户：
+
+```
+✅ Git 仓库已自动初始化并完成首次提交，继续执行...
 ```
 
 #### 2) 检查 OpenSpec 是否已初始化
