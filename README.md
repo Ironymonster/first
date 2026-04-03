@@ -6,6 +6,28 @@ ChainAgent 是一个开箱即用的多 Agent 协作开发框架，通过 `claude
 
 每个 Agent 以 **Skill** 形式封装（`skills/<role>/`），包含角色定义、模型配置和规范文件，自描述、自包含、可插拔。
 
+## ✨ 功能特性
+
+### 多 Agent 协作，全流程自动化
+Manager Agent 作为总调度，根据用户需求自动拆解任务并并行驱动 Spec、Frontend、Backend、Test 等专项 Agent 协同完成，无需人工介入中间步骤。
+
+### Spec 驱动开发（OpenSpec 工作流）
+每个需求先由 Spec Agent 生成结构化 artifacts（proposal → specs → design → tasks），再驱动开发 Agent 按规格实现，确保需求、设计、实现三者一致。
+
+### Git Worktree 多任务并行隔离
+每个需求或 Bug 修复运行在独立的 git worktree（`.worktrees/<name>/`）中，拥有独立的文件系统和分支，多个任务可以**同时并行执行互不干扰**，主工作区始终保持干净的 master。
+
+### 自动化测试闭环
+Test Agent 根据 OpenSpec 的接受标准对前后端进行验收测试，发现问题自动生成修复请求，驱动 Frontend / Backend Agent 修复并重测，最多循环 10 轮，测试通过后自动进入代码质量优化。
+
+### 开发规范自学习
+每次修复 bug 或代码优化后，Spec Agent 会将经验沉淀到项目规范文件（`rules/frontend-rule.mdc` / `rules/backend-rule.mdc`），后续开发 Agent 读取规范后自动规避同类问题。
+
+### Skill 插件化，零代码扩展
+每个 Agent 角色以独立的 Skill 目录封装（`skills/<role>/agent.md`），新增或替换角色无需修改任何 Go 代码，复制目录即可生效。
+
+---
+
 ## 🚀 快速开始
 
 ### 1. 安装依赖
@@ -65,20 +87,22 @@ claude --system-prompt-file skills/manager/agent.md --model claude-opus-4-5
 chainagent/
 ├── README.md
 ├── LICENSE
-├── install.sh                      # 一键安装脚本
-├── go.mod                          # Go 模块定义
+├── install.sh                        # 一键安装脚本（macOS / Linux）
+├── .gitignore
+├── go.mod                            # Go 模块定义
 ├── cmd/
 │   └── chainagent/
-│       └── main.go                 # CLI 入口（cobra）
+│       └── main.go                   # CLI 入口（cobra）
 ├── internal/
-│   ├── runner/runner.go            # claude subprocess + stream-json 解析
-│   ├── orchestrator/orchestrator.go # 流水线编排
-│   ├── skill/loader.go             # Skill 目录扫描
-│   └── status/status.go            # 状态文件读写
-└── skills/                         # Agent Skill 插件目录（跟项目走）
+│   ├── runner/runner.go              # claude 子进程 + stream-json 解析
+│   ├── orchestrator/orchestrator.go  # 流水线编排
+│   ├── worktree/worktree.go          # git worktree 生命周期管理
+│   ├── skill/loader.go               # Skill 目录扫描
+│   └── status/status.go              # 状态文件读写
+└── skills/                           # Agent Skill 插件目录（随项目走）
     ├── manager/
-    │   ├── SKILL.md                # 角色元数据（name/model/description）
-    │   └── agent.md                # system prompt
+    │   ├── SKILL.md                  # 角色元数据（name/model/description）
+    │   └── agent.md                  # system prompt
     ├── spec/
     │   ├── SKILL.md
     │   └── agent.md
@@ -95,6 +119,39 @@ chainagent/
     └── test/
         ├── SKILL.md
         └── agent.md
+```
+
+**目标项目运行时目录结构（chainagent 部署后）：**
+
+```
+your-project/
+├── skills/                           # 从 ChainAgent 复制过来
+├── prompts/                          # 从 ChainAgent 复制过来
+├── openspec/                         # openspec init 自动创建
+│   ├── config.yaml
+│   └── changes/
+│       └── req-001/                  # 每个需求的 artifacts
+│           ├── proposal.md
+│           ├── specs/
+│           ├── design.md
+│           ├── tasks.md
+│           └── report.md
+├── docs/
+│   ├── requirements/                 # 需求文档
+│   └── contracts/                   # API 契约（OpenAPI 3.0）
+├── inbox/                            # Agent 间通信文件
+│   ├── frontend/
+│   ├── backend/
+│   └── test/
+├── rules/                            # 项目级开发规范（自动生成）
+│   ├── frontend-rule.mdc
+│   └── backend-rule.mdc
+├── reports/                          # 测试报告、修复报告
+├── frontend/                         # 前端代码
+├── backend/                          # 后端代码
+└── .worktrees/                       # git worktree 隔离目录（gitignore）
+    ├── req-001/                      # REQ-001 的独立工作区
+    └── req-002/                      # REQ-002 的独立工作区（并行）
 ```
 
 ---
