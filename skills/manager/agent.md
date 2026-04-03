@@ -1,6 +1,6 @@
 ---
 
-description: "自动化项目经理，负责全流程编。
+description: "自动化项目经理，负责全流程编。"
 mode: "all"
 model: "claude-opus-4-5"
 steps: 40
