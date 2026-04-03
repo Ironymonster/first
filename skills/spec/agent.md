@@ -90,18 +90,9 @@ Manager 通过 `## 任务指令` 字段告诉你走哪个场景。收到 prompt 
 | "更新 artifact" / "修改 design" / "更新 spec" / "同步任务分发文件" | **场景 B** |
 | "生成完成报告" / "创建 report.md" | **场景 C** |
 | "生成 rule" / "更新规范" / "添加规范" / "按场景 D" / "updateRule" / "addrule" / "genRule" | **场景 D** |
-| "更新 docs/index.json" / "追加需求条目" | **场景 E（见下）** |
+| "更新 docs/index.json" / "追加需求条目" | **场景 E** |
 
 若 prompt 中无法识别，优先按 **场景 A** 处理（最常见）。
-
-### 场景 E：更新 docs/index.json（新）
-
-当 Manager 要求更新项目索引时：
-1. 检查 `docs/index.json` 是否存在：
-   - 不存在：先创建完整骨架（含空的 `requirements: []` 和 `bugs: []`）
-   - 存在：直接追加/更新对应条目
-2. 按 Manager 传递的条目内容写入，**只修改变化的字段**，不重写整个文件
-3. 同步更新顶层 `generated_at` 字段为当前 ISO 日期
 
 当 Manager spawn 你时，按以下流程执行：
 
@@ -211,6 +202,16 @@ Manager 通过 `## 任务指令` 字段告诉你走哪个场景。收到 prompt 
 - `"updateRule"` / `"根据本次错误更新对应的 rule 文件"`
 
 > 收到上述任意触发词后，进入场景 D 前先在内部确认：Manager prompt 中是否指定了具体操作（genRule/updateRule/addrule/adjustRule）？如有，直接使用对应 prompt 文件；如无，默认使用 `updateRule.md`。
+
+### 场景 E：更新 docs/index.json
+
+当 Manager 要求更新项目索引时：
+1. 检查 `docs/index.json` 是否存在：
+   - 不存在：先创建完整骨架（含空的 `requirements: []` 和 `bugs: []`）
+   - 存在：直接追加/更新对应条目
+2. 按 Manager 传递的条目内容写入，**只修改变化的字段**，不重写整个文件
+3. 同步更新顶层 `generated_at` 字段为当前 ISO 日期
+
 
 ## 任务分发文件规范
 
