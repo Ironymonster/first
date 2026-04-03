@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/chainagent-oss/chainagent/internal/orchestrator"
-	"github.com/chainagent-oss/chainagent/internal/status"
+	"github.com/chainagent/chainagent/internal/orchestrator"
+	"github.com/chainagent/chainagent/internal/status"
 )
 
 func main() {
@@ -57,7 +57,7 @@ func rootCmd() *cobra.Command {
 		Long: `ChainAgent 通过 claude CLI 驱动多个专项 Agent 并行工作，
 自动完成从需求分析、架构设计到代码实现、测试验收的完整开发流程。
 
-项目主页: https://github.com/chainagent-oss/chainagent`,
+项目主页: https://github.com/chainagent/chainagent`,
 	}
 
 	root.AddCommand(
